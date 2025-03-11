@@ -4,13 +4,13 @@ import random
 import networkx as nx
 import numpy as np
 from torch_geometric.utils import convert
-from loader import graph_data_obj_to_nx_simple, nx_to_graph_data_obj_simple
+from chem.loader import graph_data_obj_to_nx_simple, nx_to_graph_data_obj_simple
 from rdkit import Chem
 from rdkit.Chem import AllChem
-from loader import mol_to_graph_data_obj_simple, \
+from chem.loader import mol_to_graph_data_obj_simple, \
     graph_data_obj_to_mol_simple
 
-from loader import MoleculeDataset
+# from chem.loader import MoleculeDataset
 
 
 def check_same_molecules(s1, s2):
@@ -53,7 +53,7 @@ class NegativeEdge:
 
 
 class ExtractSubstructureContextPair:
-    def __init__(self, k, l1, l2):
+    def __init__(self, k, l1, l2, x_dim, ea_dim):
         """
         Randomly selects a node from the data object, and adds attributes
         that contain the substructure that corresponds to k hop neighbours
@@ -67,6 +67,8 @@ class ExtractSubstructureContextPair:
         self.k = k
         self.l1 = l1
         self.l2 = l2
+        self.x_dim = x_dim
+        self.ea_dim = ea_dim
 
         # for the special case of 0, addresses the quirk with
         # single_source_shortest_path_length
@@ -108,7 +110,7 @@ class ExtractSubstructureContextPair:
             substruct_G, substruct_node_map = reset_idxes(substruct_G)  # need
             # to reset node idx to 0 -> num_nodes - 1, otherwise data obj does not
             # make sense, since the node indices in data obj must start at 0
-            substruct_data = nx_to_graph_data_obj_simple(substruct_G)
+            substruct_data = nx_to_graph_data_obj_simple(substruct_G, self.x_dim, self.ea_dim)
             data.x_substruct = substruct_data.x
             data.edge_attr_substruct = substruct_data.edge_attr
             data.edge_index_substruct = substruct_data.edge_index
@@ -129,7 +131,7 @@ class ExtractSubstructureContextPair:
             context_G, context_node_map = reset_idxes(context_G)  # need to
             # reset node idx to 0 -> num_nodes - 1, otherwise data obj does not
             # make sense, since the node indices in data obj must start at 0
-            context_data = nx_to_graph_data_obj_simple(context_G)
+            context_data = nx_to_graph_data_obj_simple(context_G, self.x_dim, self.ea_dim)
             data.x_context = context_data.x
             data.edge_attr_context = context_data.edge_attr
             data.edge_index_context = context_data.edge_index

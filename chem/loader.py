@@ -158,8 +158,13 @@ def graph_data_obj_to_nx_simple(data):
     atom_features = data.x.cpu().numpy()
     num_atoms = atom_features.shape[0]
     for i in range(num_atoms):
-        atomic_num_idx, chirality_tag_idx = atom_features[i]
-        G.add_node(i, atom_num_idx=atomic_num_idx, chirality_tag_idx=chirality_tag_idx)
+        # atomic_num_idx, chirality_tag_idx = atom_features[i]
+        # G.add_node(i, atom_num_idx=atomic_num_idx, chirality_tag_idx=chirality_tag_idx)
+        # if atom_features.shape[-1] > 2:
+        #     print()
+        # VT use integers to make it independent from specific attributes
+        ka = {str(j): atom_features[i][j].item() for j in range(atom_features.shape[-1])}
+        G.add_node(i, **ka)  #atom_num_idx=atomic_num_idx, chirality_tag_idx=chirality_tag_idx)
         pass
 
     # bonds
@@ -169,14 +174,15 @@ def graph_data_obj_to_nx_simple(data):
     for j in range(0, num_bonds, 2):
         begin_idx = int(edge_index[0, j])
         end_idx = int(edge_index[1, j])
-        bond_type_idx, bond_dir_idx = edge_attr[j]
+        # bond_type_idx, bond_dir_idx = edge_attr[j]
         if not G.has_edge(begin_idx, end_idx):
-            G.add_edge(begin_idx, end_idx, bond_type_idx=bond_type_idx,
-                       bond_dir_idx=bond_dir_idx)
+            ka = {str(i): edge_attr[j][i] for i in range(edge_attr.shape[-1])}
+            G.add_edge(begin_idx, end_idx, **ka)
+            # G.add_edge(begin_idx, end_idx, bond_type_idx=bond_type_idx,bond_dir_idx=bond_dir_idx)
 
     return G
 
-def nx_to_graph_data_obj_simple(G):
+def nx_to_graph_data_obj_simple(G, x_dim, ea_dim):
     """
     Converts nx graph to pytorch geometric Data object. Assume node indices
     are numbered from 0 to num_nodes - 1. NB: Uses simplified atom and bond
@@ -187,20 +193,35 @@ def nx_to_graph_data_obj_simple(G):
     :return: pytorch geometric Data object
     """
     # atoms
-    num_atom_features = 2  # atom type,  chirality tag
+    # num_atom_features = 2  # atom type,  chirality tag
     atom_features_list = []
     for _, node in G.nodes(data=True):
-        atom_feature = [node['atom_num_idx'], node['chirality_tag_idx']]
+        test = dict(sorted(node.items()))
+        # print(test.keys)
+        test1 = {k:v for k,v in test.items() if k.isnumeric()}
+        # if len(test) > 2:
+        #     print()
+        # if len(test) != len(test1):
+        #     print()
+        atom_feature = list(test1.values()) #node['atom_num_idx'], node['chirality_tag_idx']]
+        # atom_feature1 = [node['atom_num_idx'], node['chirality_tag_idx']]
+        # if atom_feature != atom_feature1:
+        #     print()
         atom_features_list.append(atom_feature)
     x = torch.tensor(np.array(atom_features_list), dtype=torch.long)
 
     # bonds
-    num_bond_features = 2  # bond type, bond direction
+    # num_bond_features = 2  # bond type, bond direction # TODO ??
     if len(G.edges()) > 0:  # mol has bonds
         edges_list = []
         edge_features_list = []
         for i, j, edge in G.edges(data=True):
-            edge_feature = [edge['bond_type_idx'], edge['bond_dir_idx']]
+            test = dict(sorted(edge.items()))
+            test1 = {k: v for k, v in test.items() if k.isnumeric()}
+            # if len(test) != len(test1):
+            #     print()
+            edge_feature = list(test1.values())  #[edge['bond_type_idx'], edge['bond_dir_idx']]
+            # edge_feature = [edge['bond_type_idx'], edge['bond_dir_idx']]
             edges_list.append((i, j))
             edge_features_list.append(edge_feature)
             edges_list.append((j, i))
@@ -214,7 +235,7 @@ def nx_to_graph_data_obj_simple(G):
                                  dtype=torch.long)
     else:   # mol has no bonds
         edge_index = torch.empty((2, 0), dtype=torch.long)
-        edge_attr = torch.empty((0, num_bond_features), dtype=torch.long)
+        edge_attr = torch.empty((0, ea_dim), dtype=torch.long)
 
     data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
 
@@ -289,15 +310,15 @@ class MoleculeDataset(InMemoryDataset):
             self.data, self.slices = torch.load(self.processed_paths[0])
 
 
-    def get(self, idx):
-        data = Data()
-        for key in self.data.keys:
-            item, slices = self.data[key], self.slices[key]
-            s = list(repeat(slice(None), item.dim()))
-            s[data.cat_dim(key, item)] = slice(slices[idx],
-                                                    slices[idx + 1])
-            data[key] = item[s]
-        return data
+    # def get(self, idx):
+    #     data = Data()
+    #     for key in self.data.keys:
+    #         item, slices = self.data[key], self.slices[key]
+    #         s = list(repeat(slice(None), item.dim()))
+    #         s[data.cat_dim(key, item)] = slice(slices[idx],
+    #                                                 slices[idx + 1])
+    #         data[key] = item[s]
+    #     return data
 
 
     @property
